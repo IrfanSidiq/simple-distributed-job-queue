@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"jobqueue/config"
 	"jobqueue/delivery/graphql"
 	_dataloader "jobqueue/delivery/graphql/dataloader"
@@ -12,6 +13,10 @@ import (
 	"jobqueue/pkg/server"
 	inmemrepo "jobqueue/repository/inmem"
 	"jobqueue/service"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_graphql "github.com/graph-gophers/graphql-go"
@@ -19,15 +24,13 @@ import (
 
 	"github.com/labstack/echo"
 	"github.com/labstack/echo/v4/middleware"
-	"github.com/sirupsen/logrus"
 	"go.uber.org/zap"
 	"go.uber.org/zap/zapcore"
 )
 
 func main() {
 	setupLogger()
-	logger := logrus.New()
-	logger.SetReportCaller(true)
+	zap.S().Info("Application starting up...")
 	e := server.New(config.Data.Server)
 	e.Echo.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 		Format: "${remote_ip} ${time_rfc3339_nano} \"${method} ${path}\" ${status} ${bytes_out} \"${referer}\" \"${user_agent}\"\n",
@@ -79,7 +82,32 @@ func main() {
 		dataloader.EchoMiddelware,
 	)
 	e.Echo.GET("/graphiql", handler.GraphiQLHandler)
-	e.Echo.Logger.Fatal(e.Start())
+
+	// start server async so that it doesn't block
+	go func() {
+		zap.S().Info("Starting server on ", config.Data.Server.Port)
+		if err := e.Start(); err != nil && err != http.ErrServerClosed {
+			e.Echo.Logger.Fatal("shutting down the server")
+		}
+	}()
+
+	// graceful shutdown
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
+	<-quit
+
+	zap.S().Warn("Shutdown signal received. Starting graceful shutdown...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+
+	jobService.Shutdown()
+
+	if err := e.Echo.Shutdown(ctx); err != nil {
+		e.Echo.Logger.Fatal(err)
+	}
+
+	zap.S().Info("Server gracefully shut down.")
 }
 
 func setupLogger() {
@@ -88,4 +116,5 @@ func setupLogger() {
 	configLogger.DisableStacktrace = true
 	logger, _ := configLogger.Build()
 	zap.ReplaceGlobals(logger)
+	zap.RedirectStdLog(logger)
 }

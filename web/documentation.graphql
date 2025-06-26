@@ -18,6 +18,15 @@ mutation SimulateUnstableJob {
   }
 }
 
+mutation CreateIdempotentJob($task: String!, $key: String!) {
+  Enqueue(task: $task, token: $key) {
+    id
+    task
+    status
+    attempts
+  }
+}
+
 query GetAllJobs {
   Jobs {
     id

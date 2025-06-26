@@ -1,10 +1,11 @@
 package entity
 
 type Job struct {
-	ID       string `json:"id"`
-	Task     string `json:"task"`
-	Status   string `json:"status"`
-	Attempts int32  `json:"attempts"`
+	ID       string  `json:"id"`
+	Token	 *string `json:"token,omitempty"`
+	Task     string  `json:"task"`
+	Status   string  `json:"status"`
+	Attempts int32   `json:"attempts"`
 }
 
 type JobStatus struct {

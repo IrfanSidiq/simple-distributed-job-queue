@@ -12,3 +12,5 @@ const (
 )
 
 const MaxRetries = 3
+
+const WorkerPoolSize = 10

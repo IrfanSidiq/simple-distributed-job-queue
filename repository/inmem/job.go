@@ -9,8 +9,20 @@ import (
 )
 
 type jobRepository struct {
-	mu      sync.RWMutex
-	inMemDb map[string]*entity.Job
+	mu      	sync.RWMutex
+	inMemDb 	map[string]*entity.Job
+	tokenIndex 	map[string]*entity.Job
+}
+
+func (t *jobRepository) FindByToken(ctx context.Context, key string) (*entity.Job, error) {
+	t.mu.RLock()
+	defer t.mu.RUnlock()
+
+	job, exists := t.tokenIndex[key]
+	if !exists {
+		return nil, errors.New("job with that token not found")
+	}
+	return job, nil
 }
 
 // Save Job
@@ -19,6 +31,10 @@ func (t *jobRepository) Save(ctx context.Context, job *entity.Job) error {
 	defer t.mu.Unlock()
 
 	t.inMemDb[job.ID] = job
+
+	if job.Token != nil && *job.Token != "" {
+		t.tokenIndex[*job.Token] = job
+	}
 	return nil
 }
 
@@ -52,6 +68,7 @@ type Initiator func(s *jobRepository) *jobRepository
 // NewJobRepository ...
 func NewJobRepository() Initiator {
 	return func(q *jobRepository) *jobRepository {
+		q.tokenIndex = make(map[string]*entity.Job)
 		return q
 	}
 }

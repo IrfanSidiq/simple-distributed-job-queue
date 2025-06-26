@@ -7,6 +7,7 @@ import (
 	_interface "jobqueue/interface"
 	"jobqueue/pkg/constant"
 	"log"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -14,17 +15,62 @@ import (
 
 type jobService struct {
 	jobRepo _interface.JobRepository
+	jobsChannel chan *entity.Job
+	wg          sync.WaitGroup
 }
 
 type Initiator func(s *jobService) *jobService
 
-func (s *jobService) Enqueue(ctx context.Context, taskName string) (*entity.Job, error) {
+func NewJobService() Initiator {
+	return func(s *jobService) *jobService {
+		s.jobsChannel = make(chan *entity.Job, constant.WorkerPoolSize * 2)
+		s.startWorkers(constant.WorkerPoolSize)
+		log.Printf("%d job workers started.\n", constant.WorkerPoolSize)
+		return s
+	}
+}
+
+func (s *jobService) startWorkers(numWorkers int) {
+	for i := 0; i < numWorkers; i++ {
+		workerID := i + 1
+		s.wg.Add(1)
+		go func(id int) {
+			defer s.wg.Done()
+			log.Printf("Worker %d started and listening for jobs.\n", id)
+			for job := range s.jobsChannel {
+				log.Printf("Worker %d picked up job: ID=%s, Task=%s\n", id, job.ID, job.Task)
+				s.processJob(job)
+			}
+			log.Printf("Worker %d shutting down (jobsChannel closed).\n", id)
+		}(workerID)
+	}
+}
+
+func (s *jobService) Shutdown() {
+	log.Println("Job Service shutting down. No more jobs will be enqueued.")
+	close(s.jobsChannel)
+
+	log.Println("Waiting for all workers to finish their current jobs...")
+	s.wg.Wait()
+	log.Println("All workers have finished. Job service shutdown complete.")
+}
+
+func (s *jobService) Enqueue(ctx context.Context, taskName string, token *string) (*entity.Job, error) {
+	if token != nil && *token != "" {
+		existingJob, err := s.jobRepo.FindByToken(ctx, *token)
+		if err == nil && existingJob != nil {
+			log.Printf("Token '%s' matched existing job ID '%s'. Returning existing job.", *token, existingJob.ID)
+			return existingJob, nil
+		}
+	}
+
 	jobID := uuid.NewString()
 	job := &entity.Job{
-		ID:			jobID,
-		Task:		taskName,
-		Status:		constant.JobStatusPending,
-		Attempts: 	0,
+		ID:             jobID,
+		Token: 			token,
+		Task:           taskName,
+		Status:         constant.JobStatusPending,
+		Attempts:       0,
 	}
 
 	err := s.jobRepo.Save(ctx, job)
@@ -32,60 +78,77 @@ func (s *jobService) Enqueue(ctx context.Context, taskName string) (*entity.Job,
 		log.Printf("Error saving job %s: %v\n", jobID, err)
 		return nil, fmt.Errorf("failed to save job: %w", err)
 	}
-	log.Printf("Job enqueued: ID=%s, Task=%s\n", job.ID, job.Task)
+	log.Printf("New job enqueued: ID=%s, Task=%s.\n", job.ID, job.Task)
 
-	go s.processJob(job)
+	s.jobsChannel <- job
 
 	return job, nil
 }
 
-func (s *jobService) processJob(initialJob *entity.Job) {
-	job, err := s.jobRepo.FindByID(context.Background(), initialJob.ID)
+func (s *jobService) processJob(jobToProcess *entity.Job) {
+	job, err := s.jobRepo.FindByID(context.Background(), jobToProcess.ID)
 	if err != nil {
-		log.Printf("Error fetching job %s for processing: %v\n", initialJob.ID, err)
+		log.Printf("Error fetching job %s for processing by worker: %v\n", jobToProcess.ID, err)
 		return
 	}
 
-	log.Printf("Processing job: ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts+1)
+	if job.Status == constant.JobStatusCompleted || (job.Status == constant.JobStatusFailed && job.Attempts >= constant.MaxRetries) {
+		log.Printf("Job %s already processed (Status: %s, Attempts: %d). Skipping.\n", job.ID, job.Status, job.Attempts)
+		return
+	}
 
-	job.Status = constant.JobStatusRunning
+	log.Printf("Processing job: ID=%s, Task=%s, CurrentAttempt=%d (max %d)\n", job.ID, job.Task, job.Attempts, constant.MaxRetries)
+
 	job.Attempts++
+	job.Status = constant.JobStatusRunning
+	log.Printf("Processing job: ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts)
+
 	if err := s.jobRepo.Save(context.Background(), job); err != nil {
-		log.Printf("Error updating job %s to RUNNING: %v\n", job.ID, err)
+		log.Printf("Error updating job %s to RUNNING (Attempt %d): %v\n", job.ID, job.Attempts, err)
 		return
 	}
+
 
 	processingTime := 3 * time.Second
 	isUnstableJob := job.Task == "unstable-job"
+	taskSucceeded := true
 
 	if isUnstableJob {
 		processingTime = 1 * time.Second
 		if job.Attempts <= 2 {
-			time.Sleep(processingTime)
-			job.Status = constant.JobStatusFailed
-			log.Printf("Job FAILED (unstable): ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts)
-
-			if err := s.jobRepo.Save(context.Background(), job); err != nil {
-				log.Printf("Error updating job %s to FAILED (unstable): %v\n", job.ID, err)
-			}
-
-			if job.Attempts < constant.MaxRetries {
-				log.Printf("Retrying unstable job: ID=%s, Attempt %d of %d\n", job.ID, job.Attempts, constant.MaxRetries)
-				time.Sleep(2 * time.Second)
-				s.processJob(job)
-			} else {
-				log.Printf("Unstable job %s reached max retries and still failed.\n", job.ID)
-			}
-			return
+			taskSucceeded = false
 		}
 	}
 
 	time.Sleep(processingTime)
 
-	job.Status = constant.JobStatusCompleted
-	log.Printf("Job COMPLETED: ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts)
+	if taskSucceeded {
+		job.Status = constant.JobStatusCompleted
+		log.Printf("Job COMPLETED: ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts)
+	} else {
+		if job.Attempts < constant.MaxRetries {
+			log.Printf("Job FAILED (will retry): ID=%s, Task=%s, Attempt=%d of %d\n", job.ID, job.Task, job.Attempts, constant.MaxRetries)
+			job.Status = constant.JobStatusPending
+			log.Printf("Unstable job %s failed on attempt %d. Marked PENDING for retry.\n", job.ID, job.Attempts)
+
+			if err := s.jobRepo.Save(context.Background(), job); err != nil {
+				log.Printf("Error saving unstable job %s as PENDING for retry: %v\n", job.ID, err)
+				return
+			}
+
+			time.Sleep(2 * time.Second)
+			log.Printf("Re-queueing unstable job %s for attempt %d\n", job.ID, job.Attempts+1)
+
+			s.jobsChannel <- job
+			return
+		} else {
+			job.Status = constant.JobStatusFailed
+			log.Printf("Job FAILED (max retries reached): ID=%s, Task=%s, Attempt=%d\n", job.ID, job.Task, job.Attempts)
+		}
+	}
+
 	if err := s.jobRepo.Save(context.Background(), job); err != nil {
-		log.Printf("Error updating job %s to COMPLETED: %v\n", job.ID, err)
+		log.Printf("Error updating job %s to final status %s: %v\n", job.ID, job.Status, err)
 	}
 }
 
@@ -129,12 +192,6 @@ func (s *jobService) GetAllJobsStatus(ctx context.Context) (*entity.JobStatus, e
 	}
 
 	return statusCounts, nil
-}
-
-func NewJobService() Initiator {
-	return func(s *jobService) *jobService {
-		return s
-	}
 }
 
 func (i Initiator) SetJobRepository(jobRepository _interface.JobRepository) Initiator {

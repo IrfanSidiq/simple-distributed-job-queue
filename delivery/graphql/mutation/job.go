@@ -13,9 +13,13 @@ type JobMutation struct {
 	dataloader *_dataloader.GeneralDataloader
 }
 
-func (q JobMutation) Enqueue(ctx context.Context, args struct{ Task string }) (*resolver.JobResolver, error) {
+func (q JobMutation) Enqueue(ctx context.Context, args struct{
+	Task string 
+	Token *string 
+}) (*resolver.JobResolver, error) {
+
 	log.Printf("GraphQL Enqueue called with task: %s\n", args.Task)
-	createdJob, err := q.jobService.Enqueue(ctx, args.Task)
+	createdJob, err := q.jobService.Enqueue(ctx, args.Task, args.Token)
 	if err != nil {
 		log.Printf("Error in JobMutation.Enqueue: %v\n", err)
 		return nil, err

@@ -80,7 +80,7 @@ func (fi bindataFileInfo) Sys() interface{} {
 	return nil
 }
 
-var _mutationGraphql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2a\xa9\x2c\x48\x55\xf0\x2d\x2d\x49\x2c\xc9\xcc\xcf\x53\xa8\xe6\xe5\x52\x50\x50\x56\x70\x2e\x4a\x4d\x2c\x49\x55\xf0\x4b\x2d\x57\xf0\xca\x4f\x02\x89\xb9\xe6\x15\x96\xa6\x96\xa6\x6a\x94\x24\x16\x67\x5b\x29\x04\x97\x14\x65\xe6\xa5\x2b\x6a\x5a\x81\xa4\x15\x79\xb9\x6a\x01\x01\x00\x00\xff\xff\xe2\x1b\x2e\x85\x46\x00\x00\x00")
+var _mutationGraphql = []byte("\x1f\x8b\x08\x00\x00\x00\x00\x00\x00\xff\x2a\xa9\x2c\x48\x55\xf0\x2d\x2d\x49\x2c\xc9\xcc\xcf\x53\xa8\xe6\xe5\x52\x50\x50\x56\x70\x2e\x4a\x4d\x2c\x49\x55\xf0\x4b\x2d\x57\xf0\xca\x4f\x02\x89\xb9\xe6\x15\x96\xa6\x96\xa6\x6a\x94\x24\x16\x67\x5b\x29\x04\x97\x14\x65\xe6\xa5\x2b\xea\x28\x94\xe4\x67\xa7\xe6\xc1\xf8\x9a\x56\x10\xd5\xb5\x80\x00\x00\x00\xff\xff\xa7\xa7\x13\xcd\x54\x00\x00\x00")
 
 func mutationGraphqlBytes() ([]byte, error) {
 	return bindataRead(
@@ -95,7 +95,7 @@ func mutationGraphql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "mutation.graphql", size: 70, mode: os.FileMode(438), modTime: time.Unix(1749630516, 0)}
+	info := bindataFileInfo{name: "mutation.graphql", size: 84, mode: os.FileMode(511), modTime: time.Unix(1750978706, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -115,7 +115,7 @@ func queryGraphql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "query.graphql", size: 177, mode: os.FileMode(438), modTime: time.Unix(1749630495, 0)}
+	info := bindataFileInfo{name: "query.graphql", size: 177, mode: os.FileMode(511), modTime: time.Unix(1750942513, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -135,7 +135,7 @@ func schemaGraphql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "schema.graphql", size: 53, mode: os.FileMode(438), modTime: time.Unix(1749539727, 0)}
+	info := bindataFileInfo{name: "schema.graphql", size: 53, mode: os.FileMode(511), modTime: time.Unix(1750942513, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
@@ -155,7 +155,7 @@ func typeJobGraphql() (*asset, error) {
 		return nil, err
 	}
 
-	info := bindataFileInfo{name: "type/job.graphql", size: 170, mode: os.FileMode(438), modTime: time.Unix(1749625917, 0)}
+	info := bindataFileInfo{name: "type/job.graphql", size: 170, mode: os.FileMode(511), modTime: time.Unix(1750942513, 0)}
 	a := &asset{bytes: bytes, info: info}
 	return a, nil
 }
