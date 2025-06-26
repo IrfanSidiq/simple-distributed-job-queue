@@ -5,8 +5,7 @@ import (
 	_dataloader "jobqueue/delivery/graphql/dataloader"
 	"jobqueue/delivery/graphql/resolver"
 	_interface "jobqueue/interface"
-
-	"jobqueue/entity"
+	"log"
 )
 
 type JobMutation struct {
@@ -14,10 +13,16 @@ type JobMutation struct {
 	dataloader *_dataloader.GeneralDataloader
 }
 
-func (q JobMutation) Enqueue(ctx context.Context, args entity.Job) (*resolver.JobResolver, error) {
-	job := entity.Job{}
+func (q JobMutation) Enqueue(ctx context.Context, args struct{ Task string }) (*resolver.JobResolver, error) {
+	log.Printf("GraphQL Enqueue called with task: %s\n", args.Task)
+	createdJob, err := q.jobService.Enqueue(ctx, args.Task)
+	if err != nil {
+		log.Printf("Error in JobMutation.Enqueue: %v\n", err)
+		return nil, err
+	}
+
 	return &resolver.JobResolver{
-		Data:       job,
+		Data:       *createdJob,
 		JobService: q.jobService,
 		Dataloader: q.dataloader,
 	}, nil
