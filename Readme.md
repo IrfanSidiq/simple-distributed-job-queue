@@ -1,17 +1,20 @@
 # Simple Distributed Job Queue Simulation
-a simple job queue system built by golang
+a simple job queue system built with golang
+
+![Graphiql](./docs/graphiql.png)
+
+## Documentation
+Documentation of the program can be found **here**:
+📄 [Simple Distributed Job Queue Documentation (PDF)](./docs/simple-distributed-job-queue-documentation.pdf)
 
 ## Requirement:
 -> Go >= 1.20
 
 ## How to Run:
--> on VsCode -> Run(Pick Go-Debug)
--> open localhost:58579/graphiql
--> should be look like this
-![Graphiql](./docs/graphiql.jpg)
+- on VsCode, Run (Pick Go-Debug). Optionally, you can also run `go run main.go` in terminal.
+- open localhost:58579/graphiql
 
 ## Requirements
-make sure you complete all the function stated at first you load graphiql page
 1. SimultaneousCreateJob -> build a simultaneous job
 2. SimulateUnstableJob -> special case for task "unstable-job" fails twice before passing
 3. GetAllJobs -> get all jobs that already registered
@@ -29,5 +32,3 @@ make sure you complete all the function stated at first you load graphiql page
 * **Performance Awareness**: Handles 50–100 concurrent jobs without crash or slowdown.
 * **Logging and Debugging**: Logs meaningful events.
 * **Graceful Failure Handling**: No panics; job failure doesn’t crash system.
-
-# Good Luck Guys
